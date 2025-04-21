@@ -210,8 +210,8 @@ namespace s2industries.ZUGFeRD
         public Party Invoicee { get; set; }
 
         /// <summary>
-        ///     Detailed information on tax information 
-        ///     
+        ///     Detailed information on tax information
+        ///
         ///     BT-X-242-00
         /// </summary>
         private List<TaxRegistration> _InvoiceeTaxRegistration = new List<TaxRegistration>();
@@ -232,7 +232,7 @@ namespace s2industries.ZUGFeRD
 
         /// <summary>
         ///     Detailed information on tax information of the goods recipient
-        ///     
+        ///
         ///     BT-X-66-00
         /// </summary>
         private List<TaxRegistration> _ShipToTaxRegistration = new List<TaxRegistration>();
@@ -457,6 +457,11 @@ namespace s2industries.ZUGFeRD
         public List<ReceivableSpecifiedTradeAccountingAccount> _ReceivableSpecifiedTradeAccountingAccounts { get; internal set; } = new List<ReceivableSpecifiedTradeAccountingAccount>();
 
         /// <summary>
+        /// Information about how the payment is settled
+        /// </summary>
+        public List<SpecifiedTradeSettlementPaymentMeans> SpecifiedTradeSettlementPaymentMeans { get; set; } = new List<SpecifiedTradeSettlementPaymentMeans>();
+
+        /// <summary>
         /// Credit Transfer
         ///
         /// A group of business terms to specify credit transfer payments
@@ -484,7 +489,10 @@ namespace s2industries.ZUGFeRD
         ///
         /// BG-16 / BG-17 / BG-18
         /// </summary>
-        public PaymentMeans PaymentMeans { get; set; }
+        public PaymentMeans PaymentMeans {
+			get => this.SpecifiedTradeSettlementPaymentMeans.FirstOrDefault();
+			set => this.SpecifiedTradeSettlementPaymentMeans = [value];
+		}
 
         /// <summary>
         /// Detailed information about the invoicing period, start date
@@ -1091,7 +1099,7 @@ namespace s2industries.ZUGFeRD
         /// <param name="taxPercent">Tax percentage</param>
         /// <param name="reasonCode">Optional reason code</param>
         [Obsolete("Please use AddTradeAllowance() or AddTradeCharge() instead. This function will be removed with version 18.0")]
-        public void AddTradeAllowanceCharge(bool isDiscount, decimal? basisAmount, CurrencyCodes currency, decimal actualAmount,                                            
+        public void AddTradeAllowanceCharge(bool isDiscount, decimal? basisAmount, CurrencyCodes currency, decimal actualAmount,
                                             string reason, TaxTypes taxTypeCode, TaxCategoryCodes taxCategoryCode, decimal taxPercent,
                                             AllowanceReasonCodes? reasonCode = null)
         {
@@ -1109,7 +1117,7 @@ namespace s2industries.ZUGFeRD
         /// <summary>
         /// Adds an allowance (discount) on document level.
         ///
-        /// BG-27        
+        /// BG-27
         /// </summary>
         /// <param name="basisAmount">Base amount for calculation</param>
         /// <param name="currency">Currency code</param>
@@ -1145,7 +1153,7 @@ namespace s2industries.ZUGFeRD
         /// <summary>
         /// Adds an charge on document level.
         ///
-        /// BG-27        
+        /// BG-27
         /// </summary>
         /// <param name="basisAmount">Base amount for calculation</param>
         /// <param name="currency">Currency code</param>
@@ -1183,7 +1191,7 @@ namespace s2industries.ZUGFeRD
         /// <summary>
         /// Adds an charge on document level.
         ///
-        /// BG-27        
+        /// BG-27
         /// </summary>
         /// <param name="basisAmount">Base amount for calculation</param>
         /// <param name="currency">Currency code</param>
@@ -1249,8 +1257,8 @@ namespace s2industries.ZUGFeRD
         /// <summary>
         /// Adds an allowance (discount) on document level.
         ///
-        /// BG-27        
-        /// </summary>        
+        /// BG-27
+        /// </summary>
         /// <param name="basisAmount">Base amount (basis of allowance)</param>
         /// <param name="currency">Curency of the allowance</param>
         /// <param name="actualAmount">Actual allowance charge amount</param>
@@ -1286,7 +1294,7 @@ namespace s2industries.ZUGFeRD
         ///
         /// BG-27
         /// Allowance represents a discount whereas charge represents a surcharge.
-        /// </summary>        
+        /// </summary>
         /// <param name="basisAmount">Base amount (basis of allowance)</param>
         /// <param name="currency">Curency of the allowance</param>
         /// <param name="actualAmount">Actual allowance charge amount</param>
@@ -1321,7 +1329,7 @@ namespace s2industries.ZUGFeRD
         /// Returns all existing trade allowance charges
         ///
         /// BG-27
-        /// </summary>        
+        /// </summary>
         [Obsolete("Please use GetTradeAllowances() or GetTradeCharges() instead. This function will be removed with version 18.0")]
         public IList<AbstractTradeAllowanceCharge> GetTradeAllowanceCharges()
         {
@@ -1444,7 +1452,7 @@ namespace s2industries.ZUGFeRD
         /// <param name="grandTotalAmount">Total amount including tax</param>
         /// <param name="totalPrepaidAmount">Amount already paid</param>
         /// <param name="duePayableAmount">Amount due for payment</param>
-        /// <param name="roundingAmount">Rounding adjustment amount</param>        
+        /// <param name="roundingAmount">Rounding adjustment amount</param>
         public void SetTotals(decimal lineTotalAmount, decimal? chargeTotalAmount = null,
                               decimal? allowanceTotalAmount = null, decimal? taxBasisAmount = null,
                               decimal? taxTotalAmount = null, decimal? grandTotalAmount = null,
@@ -1862,7 +1870,7 @@ namespace s2industries.ZUGFeRD
         /// <param name="billingPeriodStart">Start of billing period</param>
         /// <param name="billingPeriodEnd">End of billing period</param>
         /// <returns>Returns the instance of the trade line item. You might use this object to add details such as trade allowance charges</returns>
-        [Obsolete("Please note that netUnitPrice is mandatory. This function with optional netUnitPrice parameter will be removed in version 18.0. Billing period will be removed in version 19.0. Use SetBillingPeriod() instead.")]        
+        [Obsolete("Please note that netUnitPrice is mandatory. This function with optional netUnitPrice parameter will be removed in version 18.0. Billing period will be removed in version 19.0. Use SetBillingPeriod() instead.")]
         public TradeLineItem AddTradeLineItem(string name,
                                     string description = null,
                                     QuantityCodes unitCode = QuantityCodes.Unknown,
@@ -2064,15 +2072,16 @@ namespace s2industries.ZUGFeRD
         /// <param name="information">Additional payment information</param>
         /// <param name="identifikationsnummer">SEPA creditor identifier</param>
         /// <param name="mandatsnummer">SEPA mandate reference</param>
+        [Obsolete("Payment means should be set directly in SpecifiedTradeSettlementPaymentMeans")]
         public void SetPaymentMeans(PaymentMeansTypeCodes paymentCode, string information = "", string identifikationsnummer = null, string mandatsnummer = null)
         {
-            this.PaymentMeans = new PaymentMeans
+            foreach (var tradeSettlement in this.SpecifiedTradeSettlementPaymentMeans)
             {
-                TypeCode = paymentCode,
-                Information = information,
-                SEPACreditorIdentifier = identifikationsnummer,
-                SEPAMandateReference = mandatsnummer
-            };
+                tradeSettlement.TypeCode = paymentCode;
+                tradeSettlement.Information = information;
+                tradeSettlement.SEPACreditorIdentifier = identifikationsnummer;
+                tradeSettlement.SEPAMandateReference = mandatsnummer;
+			}
         } // !SetPaymentMeans()
 
 
@@ -2082,14 +2091,15 @@ namespace s2industries.ZUGFeRD
         /// <param name="sepaCreditorIdentifier">SEPA creditor identifier</param>
         /// <param name="sepaMandateReference">SEPA mandate reference</param>
         /// <param name="information">Additional payment information</param>
+        [Obsolete("Payment means should be set directly in SpecifiedTradeSettlementPaymentMeans")]
         public void SetPaymentMeansSepaDirectDebit(string sepaCreditorIdentifier, string sepaMandateReference, string information = "")
         {
-            this.PaymentMeans = new PaymentMeans
+            foreach (var tradeSettlement in this.SpecifiedTradeSettlementPaymentMeans)
             {
-                TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
-                Information = information,
-                SEPACreditorIdentifier = sepaCreditorIdentifier,
-                SEPAMandateReference = sepaMandateReference
+                tradeSettlement.TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                tradeSettlement.Information = information,
+                tradeSettlement.SEPACreditorIdentifier = sepaCreditorIdentifier,
+                tradeSettlement.SEPAMandateReference = sepaMandateReference
             };
         } // !SetPaymentMeans()
 
@@ -2100,18 +2110,19 @@ namespace s2industries.ZUGFeRD
         /// <param name="bankCardId">Bank card identifier</param>
         /// <param name="bankCardCardholder">Cardholder name</param>
         /// <param name="information">Additional payment information</param>
+        [Obsolete("Payment means should be set directly in SpecifiedTradeSettlementPaymentMeans")]
         public void SetPaymentMeansBankCard(string bankCardId, string bankCardCardholder, string information = "")
         {
-            this.PaymentMeans = new PaymentMeans
+            foreach (var tradeSettlement in this.SpecifiedTradeSettlementPaymentMeans)
             {
-                TypeCode = PaymentMeansTypeCodes.BankCard,
-                Information = information,
-                FinancialCard = new FinancialCard
+                tradeSettlement.TypeCode = PaymentMeansTypeCodes.BankCard,
+                tradeSettlement.Information = information,
+                tradeSettlement.FinancialCard = new FinancialCard
                 {
                     Id = bankCardId,
                     CardholderName = bankCardCardholder
-                }
-            };
+                };
+            }
         } // !SetPaymentMeans()
 
 
@@ -2128,14 +2139,17 @@ namespace s2industries.ZUGFeRD
         /// <param name="name">Optional: bank account name</param>
         public void AddCreditorFinancialAccount(string iban, string bic, string id = null, string bankleitzahl = null, string bankName = null, string name = null)
         {
-            this.CreditorBankAccounts.Add(new BankAccount()
+            this.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
-                ID = id,
-                IBAN = iban,
-                BIC = bic,
-                Bankleitzahl = bankleitzahl,
-                BankName = bankName,
-                Name = name
+                CreditorBankAccount = new BankAccount()
+                {
+                    ID = id,
+                    IBAN = iban,
+                    BIC = bic,
+                    Bankleitzahl = bankleitzahl,
+                    BankName = bankName,
+                    Name = name
+                },
             });
         } // !AddCreditorFinancialAccount()
 
@@ -2180,13 +2194,16 @@ namespace s2industries.ZUGFeRD
         /// <param name="bankName">Optional: old German bank name</param>
         public void AddDebitorFinancialAccount(string iban, string bic, string id = null, string bankleitzahl = null, string bankName = null)
         {
-            this.DebitorBankAccounts.Add(new BankAccount()
+            this.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
-                ID = id,
-                IBAN = iban,
-                BIC = bic,
-                Bankleitzahl = bankleitzahl,
-                BankName = bankName
+                DebitorBankAccount = new BankAccount()
+                {
+                    ID = id,
+                    IBAN = iban,
+                    BIC = bic,
+                    Bankleitzahl = bankleitzahl,
+                    BankName = bankName,
+                },
             });
         } // !AddDebitorFinancialAccount()
 
@@ -2216,7 +2233,7 @@ namespace s2industries.ZUGFeRD
             return this.DebitorBankAccounts?.Any() == true;
         } // !AnyDebitorFinancialAccount()
 
-        
+
         /// <summary>
         /// Adds a receivable specified trade accounting account with ID and type code
         ///
@@ -2307,7 +2324,7 @@ namespace s2industries.ZUGFeRD
         {
             return this.SellerTaxRepresentativeTaxRegistration;
         } // !GetSellerTaxRepresentativeTaxRegistration()
-        /// 
+        ///
         /// </summary>
         /// <returns></returns>
         public List<TaxRegistration> GetShipToTaxRegistration()
@@ -2316,7 +2333,7 @@ namespace s2industries.ZUGFeRD
         } // !GetShipToTaxRegistration()
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <returns></returns>
         public List<TaxRegistration> GetInvoiceeTaxRegistration()
