@@ -458,15 +458,27 @@ namespace s2industries.ZUGFeRD
         /// A group of business terms to specify credit transfer payments
         ///
         /// BG-17
-        /// </summary>        
-        public List<BankAccount> CreditorBankAccounts { get; internal set; } = new List<BankAccount>();
+        /// </summary>
+        public List<BankAccount> CreditorBankAccounts =>
+            this.SpecifiedTradeSettlementPaymentMeans
+                .Select(tradeSettlement => tradeSettlement.CreditorBankAccount)
+                .ToList();
 
         /// <summary>
         /// Buyer bank information
         ///
         /// BG-16
-        /// </summary>        
-        public List<BankAccount> DebitorBankAccounts { get; internal set; } = new List<BankAccount>();
+        /// </summary>
+        public List<BankAccount> DebitorBankAccounts =>
+            this.SpecifiedTradeSettlementPaymentMeans
+                .Select(tradeSettlement => tradeSettlement.DebitorBankAccount)
+                .ToList();
+
+        /// <summary>
+        /// Information about how the payment is settled
+        /// </summary>
+        public List<SpecifiedTradeSettlementPaymentMeans> SpecifiedTradeSettlementPaymentMeans { get; set; } =
+            new List<SpecifiedTradeSettlementPaymentMeans>();
 
         /// <summary>
         /// Payment instructions
@@ -478,7 +490,24 @@ namespace s2industries.ZUGFeRD
         ///
         /// BG-16 / BG-17 / BG-18
         /// </summary>
-        public PaymentMeans PaymentMeans { get; set; }
+        [Obsolete("PaymentMeans should be set directly in SpecifiedTradeSettlementPaymentMeans")]
+        public PaymentMeans PaymentMeans
+        {
+            get => this.SpecifiedTradeSettlementPaymentMeans.FirstOrDefault();
+            set => this.SpecifiedTradeSettlementPaymentMeans = new List<SpecifiedTradeSettlementPaymentMeans>
+            {
+                new SpecifiedTradeSettlementPaymentMeans
+                {
+                    TypeCode = value.TypeCode,
+                    Information = value.Information,
+                    SEPACreditorIdentifier = value.SEPACreditorIdentifier,
+                    SEPAMandateReference = value.SEPAMandateReference,
+                    FinancialCard = value.FinancialCard,
+                    CreditorBankAccount = null,
+                    DebitorBankAccount = null,
+                },
+            };
+        }
 
         /// <summary>
         /// Detailed information about the invoicing period, start date
@@ -1899,15 +1928,16 @@ namespace s2industries.ZUGFeRD
         /// <param name="information">Additional payment information</param>
         /// <param name="identifikationsnummer">SEPA creditor identifier (in German: Gläubiger ID, formatted as DE98ZZZxxxxxxxxxxx)</param>
         /// <param name="mandatsnummer">SEPA mandate reference</param>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         public void SetPaymentMeans(PaymentMeansTypeCodes paymentCode, string information = "", string identifikationsnummer = null, string mandatsnummer = null)
         {
-            this.PaymentMeans = new PaymentMeans
+            SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
                 TypeCode = paymentCode,
                 Information = information,
                 SEPACreditorIdentifier = identifikationsnummer,
-                SEPAMandateReference = mandatsnummer
-            };
+                SEPAMandateReference = mandatsnummer,
+            });
         } // !SetPaymentMeans()
 
 
@@ -1917,15 +1947,16 @@ namespace s2industries.ZUGFeRD
         /// <param name="sepaCreditorIdentifier">SEPA creditor identifier</param>
         /// <param name="sepaMandateReference">SEPA mandate reference</param>
         /// <param name="information">Additional payment information</param>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         public void SetPaymentMeansSepaDirectDebit(string sepaCreditorIdentifier, string sepaMandateReference, string information = "")
         {
-            this.PaymentMeans = new PaymentMeans
+            SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
                 TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
                 Information = information,
                 SEPACreditorIdentifier = sepaCreditorIdentifier,
-                SEPAMandateReference = sepaMandateReference
-            };
+                SEPAMandateReference = sepaMandateReference,
+            });
         } // !SetPaymentMeans()
 
 
@@ -1935,18 +1966,19 @@ namespace s2industries.ZUGFeRD
         /// <param name="bankCardId">Bank card identifier</param>
         /// <param name="bankCardCardholder">Cardholder name</param>
         /// <param name="information">Additional payment information</param>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         public void SetPaymentMeansBankCard(string bankCardId, string bankCardCardholder, string information = "")
         {
-            this.PaymentMeans = new PaymentMeans
+            SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
                 TypeCode = PaymentMeansTypeCodes.BankCard,
                 Information = information,
                 FinancialCard = new FinancialCard
                 {
                     Id = bankCardId,
-                    CardholderName = bankCardCardholder
-                }
-            };
+                    CardholderName = bankCardCardholder,
+                },
+            });
         } // !SetPaymentMeans()
 
 
@@ -1961,16 +1993,20 @@ namespace s2industries.ZUGFeRD
         /// <param name="bankleitzahl">Optional: old German Bankleitzahl</param>
         /// <param name="bankName">Optional: old German bank name</param>
         /// <param name="name">Optional: bank account name</param>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         public void AddCreditorFinancialAccount(string iban, string bic, string id = null, string bankleitzahl = null, string bankName = null, string name = null)
         {
-            this.CreditorBankAccounts.Add(new BankAccount()
+            this.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
-                ID = id,
-                IBAN = iban,
-                BIC = bic,
-                Bankleitzahl = bankleitzahl,
-                BankName = bankName,
-                Name = name
+                CreditorBankAccount = new BankAccount
+                {
+                    ID = id,
+                    IBAN = iban,
+                    BIC = bic,
+                    Bankleitzahl = bankleitzahl,
+                    BankName = bankName,
+                    Name = name,
+                },
             });
         } // !AddCreditorFinancialAccount()
 
@@ -2013,15 +2049,19 @@ namespace s2industries.ZUGFeRD
         /// <param name="id">Optional: old German bank account no</param>
         /// <param name="bankleitzahl">Optional: old German Bankleitzahl</param>
         /// <param name="bankName">Optional: old German bank name</param>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         public void AddDebitorFinancialAccount(string iban, string bic, string id = null, string bankleitzahl = null, string bankName = null)
         {
-            this.DebitorBankAccounts.Add(new BankAccount()
+            this.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
-                ID = id,
-                IBAN = iban,
-                BIC = bic,
-                Bankleitzahl = bankleitzahl,
-                BankName = bankName
+                DebitorBankAccount = new BankAccount
+                {
+                    ID = id,
+                    IBAN = iban,
+                    BIC = bic,
+                    Bankleitzahl = bankleitzahl,
+                    BankName = bankName,
+                },
             });
         } // !AddDebitorFinancialAccount()
 
@@ -2030,6 +2070,7 @@ namespace s2industries.ZUGFeRD
         /// BT-91
         /// </summary>
         /// <param name="bankAccount"></param>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         internal void _AddDebitorFinancialAccount(BankAccount bankAccount)
         {
             this.DebitorBankAccounts.Add(bankAccount);
