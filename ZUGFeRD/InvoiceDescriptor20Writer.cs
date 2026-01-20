@@ -638,9 +638,13 @@ namespace s2industries.ZUGFeRD
             //  19. SpecifiedAdvancePayment (optional)
 
             //   1. CreditorReferenceID (optional)
-            if (!String.IsNullOrWhiteSpace(this._Descriptor.PaymentMeans?.SEPACreditorIdentifier))
+            var firstSEPACreditorIdentifier = this._Descriptor.SpecifiedTradeSettlementPaymentMeans?
+                .Where(tradeSettlement => !string.IsNullOrWhiteSpace(tradeSettlement.SEPACreditorIdentifier))
+                .FirstOrDefault()?
+                .SEPACreditorIdentifier;
+            if (firstSEPACreditorIdentifier != null)
             {
-                _Writer.WriteOptionalElementString("ram", "CreditorReferenceID", _Descriptor.PaymentMeans?.SEPACreditorIdentifier, Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung | Profile.XRechnung1);
+                _Writer.WriteOptionalElementString("ram", "CreditorReferenceID", firstSEPACreditorIdentifier, Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung | Profile.XRechnung1);
             }
 
             //   2. PaymentReference (optional)
@@ -674,86 +678,88 @@ namespace s2industries.ZUGFeRD
                 _writeOptionalParty(_Writer, "ram", "PayeeTradeParty", this._Descriptor.Payee);
             }
 
+            #region SpecifiedTradeSettlementPaymentMeans
             //  10. SpecifiedTradeSettlementPaymentMeans (optional)
-            if (!this._Descriptor.AnyCreditorFinancialAccount() && !this._Descriptor.AnyDebitorFinancialAccount())
+            foreach (var tradeSettlement in this._Descriptor.SpecifiedTradeSettlementPaymentMeans)
             {
-                if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
+                if (tradeSettlement.CreditorBankAccount == null && tradeSettlement.DebitorBankAccount == null)
                 {
                     _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
                     _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans");
 
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
+                    if (tradeSettlement.TypeCode != null)
                     {
-                        _Writer.WriteElementString("ram", "TypeCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString());
-                        _Writer.WriteOptionalElementString("ram", "Information", this._Descriptor.PaymentMeans.Information);
+                        _Writer.WriteElementString("ram", "TypeCode", tradeSettlement.TypeCode.EnumToString());
+                        _Writer.WriteOptionalElementString("ram", "Information", tradeSettlement.Information);
 
-                        if (this._Descriptor.PaymentMeans.FinancialCard != null)
+                        if (tradeSettlement.FinancialCard != null)
                         {
                             _Writer.WriteStartElement("ram", "ApplicableTradeSettlementFinancialCard", Profile.Comfort | Profile.Extended | Profile.XRechnung);
-                            _Writer.WriteElementString("ram", "ID", _Descriptor.PaymentMeans.FinancialCard.Id);
-                            _Writer.WriteElementString("ram", "CardholderName", _Descriptor.PaymentMeans.FinancialCard.CardholderName);
-                            _Writer.WriteEndElement(); // !ram:ApplicableTradeSettlementFinancialCard
-                        }
-                    }
-                    _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
-                }
-            }
-            else
-            {
-                foreach (BankAccount creditorAccount in this._Descriptor.GetCreditorFinancialAccounts())
-                {
-                    _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
-                    _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans");
-
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
-                    {
-                        _Writer.WriteElementString("ram", "TypeCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString());
-                        _Writer.WriteOptionalElementString("ram", "Information", this._Descriptor.PaymentMeans.Information);
-
-                        if (this._Descriptor.PaymentMeans.FinancialCard != null)
-                        {
-                            _Writer.WriteStartElement("ram", "ApplicableTradeSettlementFinancialCard", Profile.Comfort | Profile.Extended | Profile.XRechnung);
-                            _Writer.WriteElementString("ram", "ID", _Descriptor.PaymentMeans.FinancialCard.Id);
-                            _Writer.WriteElementString("ram", "CardholderName", _Descriptor.PaymentMeans.FinancialCard.CardholderName);
+                            _Writer.WriteElementString("ram", "ID", tradeSettlement.FinancialCard.Id);
+                            _Writer.WriteElementString("ram", "CardholderName", tradeSettlement.FinancialCard.CardholderName);
                             _Writer.WriteEndElement(); // !ram:ApplicableTradeSettlementFinancialCard
                         }
                     }
 
-                    _Writer.WriteStartElement("ram", "PayeePartyCreditorFinancialAccount");
-                    _Writer.WriteElementString("ram", "IBANID", creditorAccount.IBAN);
-                    _Writer.WriteOptionalElementString("ram", "AccountName", creditorAccount.Name);
-                    _Writer.WriteOptionalElementString("ram", "ProprietaryID", creditorAccount.ID);
-                    _Writer.WriteEndElement(); // !PayeePartyCreditorFinancialAccount
-
-                    if (!String.IsNullOrWhiteSpace(creditorAccount.BIC))
-                    {
-                        _Writer.WriteStartElement("ram", "PayeeSpecifiedCreditorFinancialInstitution");
-                        _Writer.WriteElementString("ram", "BICID", creditorAccount.BIC);
-                        _Writer.WriteOptionalElementString("ram", "GermanBankleitzahlID", creditorAccount.Bankleitzahl);
-                        _Writer.WriteEndElement(); // !PayeeSpecifiedCreditorFinancialInstitution
-                    }
                     _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
                 }
-
-                foreach (BankAccount debitorAccount in this._Descriptor.GetDebitorFinancialAccounts())
+                else
                 {
-                    _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans");
-
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
+                    if (tradeSettlement.CreditorBankAccount != null)
                     {
-                        _Writer.WriteElementString("ram", "TypeCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString());
-                        _Writer.WriteOptionalElementString("ram", "Information", this._Descriptor.PaymentMeans.Information);
+                        _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans");
+
+                        if (tradeSettlement.TypeCode != null)
+                        {
+                            _Writer.WriteElementString("ram", "TypeCode", tradeSettlement.TypeCode.EnumToString());
+                            _Writer.WriteOptionalElementString("ram", "Information", tradeSettlement.Information);
+
+                            if (tradeSettlement.FinancialCard != null)
+                            {
+                                _Writer.WriteStartElement("ram", "ApplicableTradeSettlementFinancialCard", Profile.Comfort | Profile.Extended | Profile.XRechnung);
+                                _Writer.WriteElementString("ram", "ID", tradeSettlement.FinancialCard.Id);
+                                _Writer.WriteElementString("ram", "CardholderName", tradeSettlement.FinancialCard.CardholderName);
+                                _Writer.WriteEndElement(); // !ram:ApplicableTradeSettlementFinancialCard
+                            }
+                        }
+
+                        _Writer.WriteStartElement("ram", "PayeePartyCreditorFinancialAccount");
+                        _Writer.WriteElementString("ram", "IBANID", tradeSettlement.CreditorBankAccount.IBAN);
+                        _Writer.WriteOptionalElementString("ram", "AccountName", tradeSettlement.CreditorBankAccount.Name);
+                        _Writer.WriteOptionalElementString("ram", "ProprietaryID", tradeSettlement.CreditorBankAccount.ID);
+                        _Writer.WriteEndElement(); // !PayeePartyCreditorFinancialAccount
+
+                        if (!string.IsNullOrWhiteSpace(tradeSettlement.CreditorBankAccount.BIC))
+                        {
+                            _Writer.WriteStartElement("ram", "PayeeSpecifiedCreditorFinancialInstitution");
+                            _Writer.WriteElementString("ram", "BICID", tradeSettlement.CreditorBankAccount.BIC);
+                            _Writer.WriteOptionalElementString("ram", "GermanBankleitzahlID", tradeSettlement.CreditorBankAccount.Bankleitzahl);
+                            _Writer.WriteEndElement(); // !PayeeSpecifiedCreditorFinancialInstitution
+                        }
+
+                        _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
                     }
 
-                    _Writer.WriteStartElement("ram", "PayerPartyDebtorFinancialAccount");
-                    _Writer.WriteElementString("ram", "IBANID", debitorAccount.IBAN);
-                    _Writer.WriteOptionalElementString("ram", "ProprietaryID", debitorAccount.ID);
-                    _Writer.WriteEndElement(); // !PayerPartyDebtorFinancialAccount
+                    if (tradeSettlement.DebitorBankAccount != null)
+                    {
+                        _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans");
 
-                    _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
+                        if (tradeSettlement.TypeCode != null)
+                        {
+                            _Writer.WriteElementString("ram", "TypeCode", tradeSettlement.TypeCode.EnumToString());
+                            _Writer.WriteOptionalElementString("ram", "Information", tradeSettlement.Information);
+                        }
+
+                        _Writer.WriteStartElement("ram", "PayerPartyDebtorFinancialAccount");
+                        _Writer.WriteElementString("ram", "IBANID", tradeSettlement.DebitorBankAccount.IBAN);
+                        _Writer.WriteOptionalElementString("ram", "ProprietaryID", tradeSettlement.DebitorBankAccount.ID);
+                        _Writer.WriteEndElement();// !PayerPartyDebtorFinancialAccount
+                        _Writer.WriteEndElement();// !SpecifiedTradeSettlementPaymentMeans
+                    }
                 }
             }
 
+            #endregion
 
             /*
              * @todo add writer for this:
@@ -839,13 +845,17 @@ namespace s2industries.ZUGFeRD
 
             //  15. SpecifiedTradePaymentTerms (optional)
             //  The cardinality depends on the profile.
+            var firstSepaMandateReference = _Descriptor.SpecifiedTradeSettlementPaymentMeans
+                .Where(tradeSettlement => !string.IsNullOrWhiteSpace(tradeSettlement.SEPAMandateReference))
+                .FirstOrDefault()?
+                .SEPAMandateReference;
             switch (_Descriptor.Profile)
             {
                 case Profile.Unknown:
                 case Profile.Minimum:
                     break;
                 case Profile.XRechnung:
-                    if (_Descriptor.GetTradePaymentTerms().Count > 0 || !string.IsNullOrWhiteSpace(_Descriptor.PaymentMeans?.SEPAMandateReference))
+                    if (_Descriptor.GetTradePaymentTerms().Count > 0 || firstSepaMandateReference != null)
                     {
                         _Writer.WriteStartElement("ram", "SpecifiedTradePaymentTerms");
                         var sbPaymentNotes = new StringBuilder();
@@ -873,7 +883,7 @@ namespace s2industries.ZUGFeRD
                             _writeElementWithAttribute(_Writer, "udt", "DateTimeString", "format", "102", _formatDate(dueDate.Value));
                             _Writer.WriteEndElement(); // !ram:DueDateDateTime
                         }
-                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference);
+                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSepaMandateReference);
                         _Writer.WriteEndElement();
                     }
                     break;
@@ -888,7 +898,7 @@ namespace s2industries.ZUGFeRD
                             _writeElementWithAttribute(_Writer, "udt", "DateTimeString", "format", "102", _formatDate(paymentTerms.DueDate.Value));
                             _Writer.WriteEndElement(); // !ram:DueDateDateTime
                         }
-                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference);
+                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSepaMandateReference);
                         if (paymentTerms.PaymentTermsType.HasValue)
                         {
                             if (paymentTerms.PaymentTermsType == PaymentTermsType.Skonto)
@@ -910,15 +920,15 @@ namespace s2industries.ZUGFeRD
                         }
                         _Writer.WriteEndElement();
                     }
-                    if (this._Descriptor.GetTradePaymentTerms().Count == 0 && !string.IsNullOrWhiteSpace(_Descriptor.PaymentMeans?.SEPAMandateReference))
+                    if (this._Descriptor.GetTradePaymentTerms().Count == 0 && firstSepaMandateReference != null)
                     {
                         _Writer.WriteStartElement("ram", "SpecifiedTradePaymentTerms");
-                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference);
+                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSepaMandateReference);
                         _Writer.WriteEndElement();
                     }
                     break;
                 default:
-                    if (_Descriptor.GetTradePaymentTerms().Count > 0 || !string.IsNullOrWhiteSpace(_Descriptor.PaymentMeans?.SEPAMandateReference))
+                    if (_Descriptor.GetTradePaymentTerms().Count > 0 || firstSepaMandateReference != null)
                     {
                         _Writer.WriteStartElement("ram", "SpecifiedTradePaymentTerms");
                         var sbPaymentNotes = new StringBuilder();
@@ -955,7 +965,7 @@ namespace s2industries.ZUGFeRD
                             _writeElementWithAttribute(_Writer, "udt", "DateTimeString", "format", "102", _formatDate(dueDate.Value));
                             _Writer.WriteEndElement(); // !ram:DueDateDateTime
                         }
-                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference);
+                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSepaMandateReference);
                         _Writer.WriteEndElement();
                     }
                     break;

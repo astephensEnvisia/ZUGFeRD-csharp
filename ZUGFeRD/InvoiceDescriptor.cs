@@ -461,6 +461,7 @@ namespace s2industries.ZUGFeRD
         /// </summary>
         public List<BankAccount> CreditorBankAccounts =>
             this.SpecifiedTradeSettlementPaymentMeans
+                .Where(tradeSettlement => tradeSettlement.CreditorBankAccount != null)
                 .Select(tradeSettlement => tradeSettlement.CreditorBankAccount)
                 .ToList();
 
@@ -471,6 +472,7 @@ namespace s2industries.ZUGFeRD
         /// </summary>
         public List<BankAccount> DebitorBankAccounts =>
             this.SpecifiedTradeSettlementPaymentMeans
+                .Where(tradeSettlement => tradeSettlement.DebitorBankAccount != null)
                 .Select(tradeSettlement => tradeSettlement.DebitorBankAccount)
                 .ToList();
 
