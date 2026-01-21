@@ -329,59 +329,37 @@ namespace s2industries.ZUGFeRD
 
             // PaymentMeans
             _WriteComment(_Writer, options, InvoiceCommentConstants.ApplicableHeaderTradeSettlementComment);
-            if (!this._Descriptor.AnyCreditorFinancialAccount() && !this._Descriptor.AnyDebitorFinancialAccount())
+            foreach (var tradeSettlement in this._Descriptor.SpecifiedTradeSettlementPaymentMeans)
             {
-                if (this._Descriptor.PaymentMeans != null)
+                if (tradeSettlement.TypeCode == null)
                 {
-
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
-                    {
-                        _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
-                        _Writer.WriteStartElement("cac", "PaymentMeans", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-                        _Writer.WriteElementString("cbc", "PaymentMeansCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString());
-                        _Writer.WriteOptionalElementString("cbc", "PaymentID", this._Descriptor.PaymentReference);
-
-                        if (this._Descriptor.PaymentMeans.FinancialCard != null)
-                        {
-                            _Writer.WriteStartElement("cac", "CardAccount", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-                            _Writer.WriteElementString("cbc", "PrimaryAccountNumberID", this._Descriptor.PaymentMeans.FinancialCard.Id);
-                            _Writer.WriteOptionalElementString("cbc", "HolderName", this._Descriptor.PaymentMeans.FinancialCard.CardholderName);
-                            _Writer.WriteEndElement(); //!CardAccount
-                        }
-                        _Writer.WriteEndElement(); // !PaymentMeans
-                    }
+                    continue;
                 }
-            }
-            else
-            {
-                foreach (BankAccount account in this._Descriptor.GetCreditorFinancialAccounts())
+
+                _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
+                _Writer.WriteStartElement("cac", "PaymentMeans", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
+                _Writer.WriteElementString("cbc", "PaymentMeansCode", tradeSettlement.TypeCode.EnumToString());
+                _Writer.WriteOptionalElementString("cbc", "PaymentID", this._Descriptor.PaymentReference);
+
+                if (tradeSettlement.FinancialCard != null)
                 {
-                    _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
-                    _Writer.WriteStartElement("cac", "PaymentMeans", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
+                    _Writer.WriteStartElement("cac", "CardAccount", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
+                    _Writer.WriteElementString("cbc", "PrimaryAccountNumberID", tradeSettlement.FinancialCard.Id);
+                    _Writer.WriteOptionalElementString("cbc", "HolderName", tradeSettlement.FinancialCard.CardholderName);
+                    _Writer.WriteEndElement(); // !CardAccount
+                }
 
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
-                    {
-                        _Writer.WriteElementString("cbc", "PaymentMeansCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString());
-                        _Writer.WriteOptionalElementString("cbc", "PaymentID", this._Descriptor.PaymentReference);
-
-                        if (this._Descriptor.PaymentMeans.FinancialCard != null)
-                        {
-                            _Writer.WriteStartElement("cac", "CardAccount", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-                            _Writer.WriteElementString("cbc", "PrimaryAccountNumberID", this._Descriptor.PaymentMeans.FinancialCard.Id);
-                            _Writer.WriteOptionalElementString("cbc", "HolderName", this._Descriptor.PaymentMeans.FinancialCard.CardholderName);
-                            _Writer.WriteEndElement(); //!CardAccount
-                        }
-                    }
-
+                if (tradeSettlement.CreditorBankAccount != null)
+                {
                     // PayeeFinancialAccount
                     _Writer.WriteStartElement("cac", "PayeeFinancialAccount");
-                    _Writer.WriteElementString("cbc", "ID", account.IBAN);
-                    _Writer.WriteOptionalElementString("cbc", "Name", account.Name);
+                    _Writer.WriteElementString("cbc", "ID", tradeSettlement.CreditorBankAccount.IBAN);
+                    _Writer.WriteOptionalElementString("cbc", "Name", tradeSettlement.CreditorBankAccount.Name);
 
-                    if (!string.IsNullOrWhiteSpace(account.BIC))
+                    if (!string.IsNullOrWhiteSpace(tradeSettlement.CreditorBankAccount.BIC))
                     {
                         _Writer.WriteStartElement("cac", "FinancialInstitutionBranch");
-                        _Writer.WriteElementString("cbc", "ID", account.BIC);
+                        _Writer.WriteElementString("cbc", "ID", tradeSettlement.CreditorBankAccount.BIC);
 
                         //[UBL - CR - 664] - A UBL invoice should not include the FinancialInstitutionBranch FinancialInstitution
                         //_Writer.WriteStartElement("cac", "FinancialInstitution");
@@ -392,29 +370,20 @@ namespace s2industries.ZUGFeRD
                     }
 
                     _Writer.WriteEndElement(); // !PayeeFinancialAccount
-
-                    _Writer.WriteEndElement(); // !PaymentMeans
                 }
 
                 //[BR - 67] - An Invoice shall contain maximum one Payment Mandate(BG - 19).
-                foreach (BankAccount account in this._Descriptor.GetDebitorFinancialAccounts())
+                if (tradeSettlement.DebitorBankAccount != null)
                 {
-                    _Writer.WriteStartElement("cac", "PaymentMeans", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
-                    {
-                        _Writer.WriteElementString("cbc", "PaymentMeansCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString());
-                        _Writer.WriteOptionalElementString("cbc", "PaymentID", this._Descriptor.PaymentReference);
-                    }
-
+                    // PaymentMandate --> PayerFinancialAccount
                     _Writer.WriteStartElement("cac", "PaymentMandate");
 
                     //PEPPOL-EN16931-R061: Mandate reference MUST be provided for direct debit.
-                    _Writer.WriteElementString("cbc", "ID", this._Descriptor.PaymentMeans.SEPAMandateReference);
+                    _Writer.WriteElementString("cbc", "ID", tradeSettlement.SEPAMandateReference);
 
                     _Writer.WriteStartElement("cac", "PayerFinancialAccount");
 
-                    _Writer.WriteElementString("cbc", "ID", account.IBAN);
+                    _Writer.WriteElementString("cbc", "ID", tradeSettlement.DebitorBankAccount.IBAN);
 
                     //[UBL-CR-440]-A UBL invoice should not include the PaymentMeans PaymentMandate PayerFinancialAccount Name
                     //_Writer.WriteElementString("cbc", "Name", account.Name);
@@ -432,9 +401,9 @@ namespace s2industries.ZUGFeRD
 
                     _Writer.WriteEndElement(); // !PayerFinancialAccount
                     _Writer.WriteEndElement(); // !PaymentMandate
-
-                    _Writer.WriteEndElement(); // !PaymentMeans
                 }
+
+                _Writer.WriteEndElement(); // !PaymentMeans
             }
 
             // PaymentTerms (optional)
@@ -965,12 +934,16 @@ namespace s2industries.ZUGFeRD
                 if (partyType == PartyTypes.SellerTradeParty)
                 {
                     // This is the identification of the seller, not the buyer
-                    if (!string.IsNullOrWhiteSpace(this._Descriptor.PaymentMeans?.SEPACreditorIdentifier))
+                    var firstSEPACreditorIdentifier = this._Descriptor.SpecifiedTradeSettlementPaymentMeans?
+                        .Where(tradeSettlement => !string.IsNullOrWhiteSpace(tradeSettlement.SEPACreditorIdentifier))
+                        .FirstOrDefault()?
+                        .SEPACreditorIdentifier;
+                    if (firstSEPACreditorIdentifier != null)
                     {
                         writer.WriteStartElement("cac", "PartyIdentification");
                         writer.WriteStartElement("cbc", "ID"); // BT-90
                         writer.WriteAttributeString("schemeID", "SEPA");
-                        writer.WriteValue(this._Descriptor.PaymentMeans.SEPACreditorIdentifier);
+                        writer.WriteValue(firstSEPACreditorIdentifier);
                         writer.WriteEndElement();//!ID
                         writer.WriteEndElement();//!PartyIdentification
                     }
