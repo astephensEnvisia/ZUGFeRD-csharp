@@ -848,10 +848,14 @@ namespace s2industries.ZUGFeRD
             //  19. SpecifiedAdvancePayment (optional)
 
             //   1. CreditorReferenceID (BT-90) is only required/allowed on DirectDebit (BR-DE-30)
-            if ((this._Descriptor.PaymentMeans?.TypeCode == PaymentMeansTypeCodes.DirectDebit || this._Descriptor.PaymentMeans?.TypeCode == PaymentMeansTypeCodes.SEPADirectDebit) &&
-                !String.IsNullOrWhiteSpace(this._Descriptor.PaymentMeans?.SEPACreditorIdentifier))
+            var sepaSettlement = this._Descriptor.SpecifiedTradeSettlementPaymentMeans?
+                .Where(tradeSettlement =>
+                    tradeSettlement.TypeCode == PaymentMeansTypeCodes.DirectDebit ||
+                    tradeSettlement.TypeCode == PaymentMeansTypeCodes.SEPADirectDebit)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(sepaSettlement?.SEPACreditorIdentifier))
             {
-                _Writer.WriteElementString("ram", "CreditorReferenceID", _Descriptor.PaymentMeans?.SEPACreditorIdentifier, ALL_PROFILES ^ Profile.Minimum);
+                _Writer.WriteElementString("ram", "CreditorReferenceID", sepaSettlement.SEPACreditorIdentifier, ALL_PROFILES ^ Profile.Minimum);
             }
 
             //   2. PaymentReference (optional), Verwendungszweck, BT-83
@@ -882,80 +886,90 @@ namespace s2industries.ZUGFeRD
             #region SpecifiedTradeSettlementPaymentMeans
             //  10. SpecifiedTradeSettlementPaymentMeans (optional), BG-16
 
-            if (!this._Descriptor.AnyCreditorFinancialAccount() && !this._Descriptor.AnyDebitorFinancialAccount())
+            foreach (var tradeSettlement in this._Descriptor.SpecifiedTradeSettlementPaymentMeans)
             {
-                if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
+                if (tradeSettlement.TypeCode == null)
                 {
-                    _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
-                    _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans", ALL_PROFILES ^ Profile.Minimum); // BG-16
-                    _Writer.WriteElementString("ram", "TypeCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString(), ALL_PROFILES ^ Profile.Minimum);
-                    _Writer.WriteOptionalElementString("ram", "Information", this._Descriptor.PaymentMeans.Information, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
-
-                    if (!string.IsNullOrWhiteSpace(this._Descriptor.PaymentMeans.FinancialCard?.Id)) // BG-18
-                    {
-                        _Writer.WriteStartElement("ram", "ApplicableTradeSettlementFinancialCard", PROFILE_COMFORT_EXTENDED_XRECHNUNG);
-                        _Writer.WriteElementString("ram", "ID", _Descriptor.PaymentMeans.FinancialCard.Id); // BT-87
-                        _Writer.WriteOptionalElementString("ram", "CardholderName", _Descriptor.PaymentMeans.FinancialCard.CardholderName); // BT-88
-                        _Writer.WriteEndElement(); // !ram:ApplicableTradeSettlementFinancialCard
-                    }
-                    _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
+                    continue;
                 }
-            }
-            else
-            {
-                foreach (BankAccount account in this._Descriptor.GetCreditorFinancialAccounts())
+
+                _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
+
+                // BG-16 0..unbounded PAYMENT INSTRUCTIONS according to EN16931
+                _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans", ALL_PROFILES ^ Profile.Minimum);
+
+                // BT-81 1..1 Payment means type code
+                _Writer.WriteElementString("ram", "TypeCode", tradeSettlement.TypeCode.EnumToString(), ALL_PROFILES ^ Profile.Minimum);
+
+                // BT-82 0..1 Payment means description
+                _Writer.WriteOptionalElementString("ram", "Information", tradeSettlement.Information, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
+
+                if (string.IsNullOrWhiteSpace(tradeSettlement.FinancialCard?.Id))
                 {
-                    _WriteComment(_Writer, options, InvoiceCommentConstants.SpecifiedTradeSettlementPaymentMeansComment);
-                    _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans", ALL_PROFILES ^ Profile.Minimum);
+                    // BG-18 0..1 PAYMENT CARD INFORMATION
+                    _Writer.WriteStartElement("ram", "ApplicableTradeSettlementFinancialCard", PROFILE_COMFORT_EXTENDED_XRECHNUNG);
 
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
-                    {
-                        _Writer.WriteElementString("ram", "TypeCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString(), ALL_PROFILES ^ Profile.Minimum);
-                        _Writer.WriteOptionalElementString("ram", "Information", this._Descriptor.PaymentMeans.Information, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
+                    // BT-87 1..1 Payment card primary account number
+                    _Writer.WriteElementString("ram", "ID", tradeSettlement.FinancialCard.Id);
 
-                        if (this._Descriptor.PaymentMeans.FinancialCard != null)
-                        {
-                            _Writer.WriteStartElement("ram", "ApplicableTradeSettlementFinancialCard", PROFILE_COMFORT_EXTENDED_XRECHNUNG);
-                            _Writer.WriteOptionalElementString("ram", "ID", _Descriptor.PaymentMeans.FinancialCard.Id);
-                            _Writer.WriteOptionalElementString("ram", "CardholderName", _Descriptor.PaymentMeans.FinancialCard.CardholderName);
-                            _Writer.WriteEndElement(); // !ram:ApplicableTradeSettlementFinancialCard
-                        }
-                    }
+                    // BT-88 0..1 Payment card holder name
+                    _Writer.WriteOptionalElementString("ram", "CardholderName", tradeSettlement.FinancialCard.CardholderName);
+                    _Writer.WriteEndElement(); // !ram:ApplicableTradeSettlementFinancialCard
+                }
 
+                if (tradeSettlement.CreditorBankAccount != null)
+                {
+                    // BG-17 0..1 CREDIT TRANSFER
                     _Writer.WriteStartElement("ram", "PayeePartyCreditorFinancialAccount", ALL_PROFILES ^ Profile.Minimum);
-                    _Writer.WriteElementString("ram", "IBANID", account.IBAN);
-                    _Writer.WriteOptionalElementString("ram", "AccountName", account.Name, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
-                    _Writer.WriteOptionalElementString("ram", "ProprietaryID", account.ID);
+
+                    // BT-84 0..1 Payment account identifier
+                    _Writer.WriteElementString("ram", "IBANID", tradeSettlement.CreditorBankAccount.IBAN);
+
+                    // BT-85 0..1 Payment account name
+                    _Writer.WriteOptionalElementString("ram", "AccountName", tradeSettlement.CreditorBankAccount.Name, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
+
+                    // BT-84-0 0..1 National account number (not SEPA)
+                    _Writer.WriteOptionalElementString("ram", "ProprietaryID", tradeSettlement.CreditorBankAccount.ID);
                     _Writer.WriteEndElement(); // !PayeePartyCreditorFinancialAccount
 
-                    if (!String.IsNullOrWhiteSpace(account.BIC))
+                    if (!string.IsNullOrWhiteSpace(tradeSettlement.CreditorBankAccount.BIC))
                     {
+                        // BT-86-00 0..1 Seller bank information
                         _Writer.WriteStartElement("ram", "PayeeSpecifiedCreditorFinancialInstitution", PROFILE_COMFORT_EXTENDED_XRECHNUNG);
-                        _Writer.WriteElementString("ram", "BICID", account.BIC);
+
+                        // BT-86 1..1 Payment service provider identifier
+                        _Writer.WriteElementString("ram", "BICID", tradeSettlement.CreditorBankAccount.BIC);
                         _Writer.WriteEndElement(); // !PayeeSpecifiedCreditorFinancialInstitution
                     }
-
-                    _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
                 }
 
-                foreach (BankAccount account in this._Descriptor.GetDebitorFinancialAccounts())
+                if (tradeSettlement.DebitorBankAccount != null)
                 {
-                    _Writer.WriteStartElement("ram", "SpecifiedTradeSettlementPaymentMeans", ALL_PROFILES ^ Profile.Minimum); // BG-16
-
-                    if ((this._Descriptor.PaymentMeans != null) && this._Descriptor.PaymentMeans.TypeCode.HasValue)
-                    {
-                        _Writer.WriteElementString("ram", "TypeCode", this._Descriptor.PaymentMeans.TypeCode.EnumToString(), ALL_PROFILES ^ Profile.Minimum);
-                        _Writer.WriteOptionalElementString("ram", "Information", this._Descriptor.PaymentMeans.Information, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
-                    }
-
+                    // BT-91-00 0..1 Buyer bank information
                     _Writer.WriteStartElement("ram", "PayerPartyDebtorFinancialAccount", ALL_PROFILES ^ Profile.Minimum);
-                    _Writer.WriteElementString("ram", "IBANID", account.IBAN);
-                    _Writer.WriteOptionalElementString("ram", "AccountName", account.Name, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
-                    _Writer.WriteOptionalElementString("ram", "ProprietaryID", account.ID);
-                    _Writer.WriteEndElement(); // !PayerPartyDebtorFinancialAccount
 
-                    _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
+                    // BT-91 1..1 Debited account identifier
+                    _Writer.WriteElementString("ram", "IBANID", tradeSettlement.DebitorBankAccount.IBAN);
+
+                    // BT-85 0..1 (unused in EN16931)
+                    _Writer.WriteOptionalElementString("ram", "AccountName", tradeSettlement.DebitorBankAccount.Name, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
+
+                    // BT-84-0 0..1 (unused in EN16931)
+                    _Writer.WriteOptionalElementString("ram", "ProprietaryID", tradeSettlement.DebitorBankAccount.ID, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
+                    _Writer.WriteEndElement();// !PayerPartyDebtorFinancialAccount
+
+                    if (!string.IsNullOrWhiteSpace(tradeSettlement.DebitorBankAccount.BIC))
+                    {
+                        // BT-86-00 0..1 (unused in EN16931)
+                        _Writer.WriteStartElement("ram", "PayerSpecifiedDebtorFinancialInstitution", PROFILE_COMFORT_EXTENDED_XRECHNUNG);
+
+                        // BT-86 1..1 (unused in EN16931)
+                        _Writer.WriteElementString("ram", "BICID", tradeSettlement.DebitorBankAccount.BIC, PROFILE_COMFORT_EXTENDED_XRECHNUNG);
+                        _Writer.WriteEndElement(); // !PayerSpecifiedDebtorFinancialInstitution
+                    }
                 }
+
+                _Writer.WriteEndElement(); // !SpecifiedTradeSettlementPaymentMeans
             }
             #endregion
 
@@ -1025,13 +1039,17 @@ namespace s2industries.ZUGFeRD
 
             //  15. SpecifiedTradePaymentTerms (optional)
             //  The cardinality depends on the profile.
+            var firstSEPAMandateReference = this._Descriptor.SpecifiedTradeSettlementPaymentMeans?
+                .Where(tradeSettlement => !string.IsNullOrWhiteSpace(tradeSettlement.SEPAMandateReference))
+                .FirstOrDefault();
+
             switch (_Descriptor.Profile)
             {
                 case Profile.Unknown:
                 case Profile.Minimum:
                     break;
                 case Profile.XRechnung:
-                    if (_Descriptor.GetTradePaymentTerms().Count > 0 || !string.IsNullOrWhiteSpace(_Descriptor.PaymentMeans?.SEPAMandateReference))
+                    if (_Descriptor.GetTradePaymentTerms().Count > 0 || firstSEPAMandateReference != null)
                     {
                         _Writer.WriteStartElement("ram", "SpecifiedTradePaymentTerms");
 
@@ -1087,9 +1105,10 @@ namespace s2industries.ZUGFeRD
                         }
 
                         // BT-89 is only required/allowed on DirectDebit (BR-DE-29)
-                        if (this._Descriptor.PaymentMeans?.TypeCode == PaymentMeansTypeCodes.DirectDebit || this._Descriptor.PaymentMeans?.TypeCode == PaymentMeansTypeCodes.SEPADirectDebit)
+                        if (firstSEPAMandateReference?.TypeCode == PaymentMeansTypeCodes.DirectDebit ||
+                            firstSEPAMandateReference?.TypeCode == PaymentMeansTypeCodes.SEPADirectDebit)
                         {
-                            _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference);
+                            _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSEPAMandateReference?.SEPAMandateReference);
                         }
 
                         _Writer.WriteEndElement(); // !ram:SpecifiedTradePaymentTerms
@@ -1106,7 +1125,7 @@ namespace s2industries.ZUGFeRD
                             _writeElementWithAttributeWithPrefix(_Writer, "udt", "DateTimeString", "format", "102", _formatDate(paymentTerms.DueDate.Value));
                             _Writer.WriteEndElement(); // !ram:DueDateDateTime
                         }
-                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference);
+                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSEPAMandateReference?.SEPAMandateReference);
                         if (paymentTerms.PaymentTermsType.HasValue)
                         {
                             if (paymentTerms.PaymentTermsType == PaymentTermsType.Skonto)
@@ -1148,10 +1167,10 @@ namespace s2industries.ZUGFeRD
                         }
                         _Writer.WriteEndElement(); // !ram:SpecifiedTradePaymentTerms
                     }
-                    if (this._Descriptor.GetTradePaymentTerms().Count == 0 && !string.IsNullOrWhiteSpace(_Descriptor.PaymentMeans?.SEPAMandateReference))
+                    if (this._Descriptor.GetTradePaymentTerms().Count == 0 && firstSEPAMandateReference != null)
                     {
                         _Writer.WriteStartElement("ram", "SpecifiedTradePaymentTerms");
-                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference);
+                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSEPAMandateReference.SEPAMandateReference);
                         _Writer.WriteEndElement();
                     }
                     break;
@@ -1166,7 +1185,7 @@ namespace s2industries.ZUGFeRD
                             _writeElementWithAttributeWithPrefix(_Writer, "udt", "DateTimeString", "format", "102", _formatDate(paymentTerms.DueDate.Value));
                             _Writer.WriteEndElement(); // !ram:DueDateDateTime
                         }
-                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", _Descriptor.PaymentMeans?.SEPAMandateReference, ALL_PROFILES ^ Profile.Minimum);
+                        _Writer.WriteOptionalElementString("ram", "DirectDebitMandateID", firstSEPAMandateReference?.SEPAMandateReference, ALL_PROFILES ^ Profile.Minimum);
                         _Writer.WriteEndElement(); // !ram:SpecifiedTradePaymentTerms
                     }
                     break;
