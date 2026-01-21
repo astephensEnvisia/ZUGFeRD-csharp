@@ -285,43 +285,72 @@ namespace s2industries.ZUGFeRD
                 retval.TaxCurrency = optionalTaxCurrency;
             }
 
-            // TODO: Multiple SpecifiedTradeSettlementPaymentMeans can exist for each account/institution (with different SEPA?)
-            PaymentMeans tempPaymentMeans = new PaymentMeans()
-            {
-                TypeCode = EnumExtensions.StringToNullableEnum<PaymentMeansTypeCodes>(XmlUtils.NodeAsString(doc.DocumentElement, "//cac:PaymentMeans/cbc:PaymentMeansCode", nsmgr)),
-                Information = XmlUtils.NodeAsString(doc.DocumentElement, "//cac:PaymentMeans/cbc:PaymentMeansCode/@name", nsmgr),
-                SEPACreditorIdentifier = XmlUtils.NodeAsString(doc.DocumentElement, "//cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID[@schemeID='SEPA']", nsmgr),
-                SEPAMandateReference = XmlUtils.NodeAsString(doc.DocumentElement, "//cac:PaymentMeans/cac:PaymentMandate/cbc:ID", nsmgr)
-            };
+            var sepaCreditorIdentifier = XmlUtils.NodeAsString(doc.DocumentElement,
+                "//cac:AccountingSupplierParty/cac:Party/cac:PartyIdentification/cbc:ID[@schemeID='SEPA']", nsmgr);
 
-            var financialCardId = XmlUtils.NodeAsString(doc.DocumentElement, "//cac:PaymentMeans/cac:CardAccount/cbc:PrimaryAccountNumberID", nsmgr);
-            var financialCardCardholderName = XmlUtils.NodeAsString(doc.DocumentElement, "//cac:PaymentMeans/cac:CardAccount/cbc:HolderName", nsmgr);
-
-            if (!string.IsNullOrWhiteSpace(financialCardId) || !string.IsNullOrWhiteSpace(financialCardCardholderName))
+            // Multiple SpecifiedTradeSettlementPaymentMeans may exist for each account/institution
+            // BG-16 0..unbounded PAYMENT INSTRUCTIONS according to EN16931
+            foreach (XmlNode node in doc.SelectNodes("//cac:PaymentMeans", nsmgr))
             {
-                tempPaymentMeans.FinancialCard = new FinancialCard()
+                // BT-81 1..1 Payment means type code
+                var typeCode = XmlUtils
+                    .NodeAsString(node, "./cbc:PaymentMeansCode", nsmgr)
+                    .StringToNullableEnum<PaymentMeansTypeCodes>();
+
+                if (typeCode == null)
                 {
-                    Id = financialCardId,
-                    CardholderName = financialCardCardholderName
-                };
-            }
+                    continue;
+                }
 
-            retval.PaymentMeans = tempPaymentMeans;
+                // BT-82 0..1 Payment means description
+                var information = XmlUtils.NodeAsString(node, "./cbc:PaymentMeansCode/@name", nsmgr);
+                var sepaMandateReference = XmlUtils.NodeAsString(node, "./cac:PaymentMandate/cbc:ID", nsmgr);
+                var paymentMeans = new SpecifiedTradeSettlementPaymentMeans
+                {
+                    TypeCode = typeCode,
+                    Information = string.IsNullOrWhiteSpace(information) ? null : information,
+                    SEPACreditorIdentifier = sepaCreditorIdentifier,
+                    SEPAMandateReference = sepaMandateReference,
+                };
+
+                // BG-18 0..1 PAYMENT CARD INFORMATION
+                var financialCard = node.SelectSingleNode("./cac:CardAccount", nsmgr);
+                if (financialCard != null)
+                {
+                    // BT-87 1..1 Payment card primary account number
+                    var financialCardId = XmlUtils.NodeAsString(financialCard, "./cbc:PrimaryAccountNumberID", nsmgr);
+
+                    // BT-88 0..1 Payment card holder name
+                    var cardHolderName = XmlUtils.NodeAsString(financialCard, "./cbc:HolderName", nsmgr);
+                    if (!string.IsNullOrEmpty(financialCardId))
+                    {
+                        paymentMeans.FinancialCard = new FinancialCard
+                        {
+                            Id = financialCardId,
+                            CardholderName = string.IsNullOrWhiteSpace(cardHolderName) ? null : cardHolderName,
+                        };
+                    }
+                }
+
+                // BG-17 0..1 CREDIT TRANSFER
+                var creditorAccount = node.SelectSingleNode("./cac:PayeeFinancialAccount", nsmgr);
+                if (creditorAccount != null)
+                {
+                    paymentMeans.CreditorBankAccount = _nodeAsBankAccount(creditorAccount, nsmgr);
+                }
+
+                // BT-91-00 0..1 Buyer bank information
+                var debitorAccount = node.SelectSingleNode("./cac:PaymentMandate/cac:PayerFinancialAccount", nsmgr);
+                if (debitorAccount != null)
+                {
+                    paymentMeans.DebitorBankAccount = _nodeAsBankAccount(debitorAccount, nsmgr);
+                }
+
+                retval.SpecifiedTradeSettlementPaymentMeans.Add(paymentMeans);
+            }
 
             retval.BillingPeriodStart = XmlUtils.NodeAsDateTime(doc.DocumentElement, "//cac:InvoicePeriod/cbc:StartDate", nsmgr);
             retval.BillingPeriodEnd = XmlUtils.NodeAsDateTime(doc.DocumentElement, "//cac:InvoicePeriod/cbc:EndDate", nsmgr);
-
-            XmlNodeList creditorFinancialAccountNodes = doc.SelectNodes("//cac:PaymentMeans/cac:PayeeFinancialAccount", nsmgr);
-            foreach (XmlNode node in creditorFinancialAccountNodes)
-            {
-                retval._AddCreditorFinancialAccount(_nodeAsBankAccount(node, ".", nsmgr));
-            }
-
-            XmlNodeList debitorFinancialAccountNodes = doc.SelectNodes("//cac:PaymentMeans/cac:PaymentMandate/cac:PayerFinancialAccount", nsmgr);
-            foreach (XmlNode node in debitorFinancialAccountNodes)
-            {
-                retval._AddDebitorFinancialAccount(_nodeAsBankAccount(node, ".", nsmgr));
-            }
 
             foreach (XmlNode node in doc.SelectNodes("/*/cac:TaxTotal/cac:TaxSubtotal", nsmgr))
             {
@@ -874,20 +903,14 @@ namespace s2industries.ZUGFeRD
 
             return retval;
         } // !_nodeAsAddressParty()
-        private static BankAccount _nodeAsBankAccount(XmlNode baseNode, string xpath, XmlNamespaceManager nsmgr = null)
+        private static BankAccount _nodeAsBankAccount(XmlNode node, XmlNamespaceManager nsmgr = null)
         {
-            if (baseNode == null)
-            {
-                return null;
-            }
-
-            XmlNode node = baseNode.SelectSingleNode(xpath, nsmgr);
             if (node == null)
             {
                 return null;
             }
 
-            BankAccount retval = new BankAccount()
+            BankAccount retval = new BankAccount
             {
                 Name = XmlUtils.NodeAsString(node, "cbc:Name", nsmgr),
                 IBAN = XmlUtils.NodeAsString(node, "cbc:ID", nsmgr),
