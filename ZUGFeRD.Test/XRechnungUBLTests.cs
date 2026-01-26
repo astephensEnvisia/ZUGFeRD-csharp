@@ -626,18 +626,19 @@ namespace s2industries.ZUGFeRD.Test
             InvoiceDescriptor desc = this._InvoiceProvider.CreateInvoice();
             MemoryStream ms = new MemoryStream();
 
-            desc.CreditorBankAccounts.Clear();
-
-            desc.CreditorBankAccounts.Add(new BankAccount()
-            {
-                IBAN = iban1,
-                BIC = bic1
-            });
-            desc.CreditorBankAccounts.Add(new BankAccount()
-            {
-                IBAN = iban2,
-                BIC = bic2
-            });
+            desc.SpecifiedTradeSettlementPaymentMeans =
+            [
+                new SpecifiedTradeSettlementPaymentMeans
+                {
+                    TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                    CreditorBankAccount = new BankAccount { IBAN = iban1, BIC = bic1 },
+                },
+                new SpecifiedTradeSettlementPaymentMeans
+                {
+                    TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                    CreditorBankAccount = new BankAccount { IBAN = iban2, BIC = bic2 },
+                },
+            ];
 
             desc.Save(ms, ZUGFeRDVersion.Version23, Profile.XRechnung, ZUGFeRDFormats.UBL);
             ms.Seek(0, SeekOrigin.Begin);
