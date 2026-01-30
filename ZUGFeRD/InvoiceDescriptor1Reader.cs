@@ -159,49 +159,109 @@ namespace s2industries.ZUGFeRD
             retval.PaymentReference = XmlUtils.NodeAsString(doc.DocumentElement, "//ram:ApplicableSupplyChainTradeSettlement/ram:PaymentReference", nsmgr);
             retval.Currency = EnumExtensions.StringToEnum<CurrencyCodes>(XmlUtils.NodeAsString(doc.DocumentElement, "//ram:ApplicableSupplyChainTradeSettlement/ram:InvoiceCurrencyCode", nsmgr));
 
-            // TODO: Multiple SpecifiedTradeSettlementPaymentMeans can exist for each account/institution (with different SEPA?)
-            PaymentMeans paymentMeans = new PaymentMeans()
+            // Multiple SpecifiedTradeSettlementPaymentMeans may exist for each account/institution // TODO
+            // BG-16 0..unbounded PAYMENT INSTRUCTIONS according to EN16931
+            foreach (XmlNode node in doc.DocumentElement.SelectNodes("//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans", nsmgr))
             {
-                TypeCode = EnumExtensions.StringToNullableEnum<PaymentMeansTypeCodes>(XmlUtils.NodeAsString(doc.DocumentElement, "//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:TypeCode", nsmgr)),
-                Information = XmlUtils.NodeAsString(doc.DocumentElement, "//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:Information", nsmgr),
-                SEPACreditorIdentifier = XmlUtils.NodeAsString(doc.DocumentElement, "//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:ID", nsmgr),
-                SEPAMandateReference = XmlUtils.NodeAsString(doc.DocumentElement, "//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:ID/@schemeAgencyID", nsmgr)
-            };
-            retval.PaymentMeans = paymentMeans;
+                // BT-81 1..1 Payment means type code
+                var typeCode = XmlUtils
+                    .NodeAsString(node, "./ram:TypeCode", nsmgr)
+                    .StringToNullableEnum<PaymentMeansTypeCodes>();
+
+                if (typeCode == null)
+                {
+                    continue;
+                }
+
+                // BT-82 0..1 Payment means description
+                var information = XmlUtils.NodeAsString(node, "./ram:Information", nsmgr);
+                var paymentMeans = new SpecifiedTradeSettlementPaymentMeans
+                {
+                    TypeCode = typeCode,
+                    Information = string.IsNullOrWhiteSpace(information) ? null : information,
+                    SEPACreditorIdentifier = XmlUtils.NodeAsString(node, "./ram:ID", nsmgr),
+                    SEPAMandateReference = XmlUtils.NodeAsString(node, "./ram:ID/@schemeAgencyID", nsmgr),
+                };
+
+                // BG-17 0..1
+                var creditorAccount = node.SelectSingleNode(
+                    "./ram:PayeePartyCreditorFinancialAccount",
+                    nsmgr);
+                var creditorFinancialInstitution = node.SelectSingleNode(
+                    "./ram:PayeeSpecifiedCreditorFinancialInstitution",
+                    nsmgr);
+                if (creditorAccount != null || creditorFinancialInstitution != null)
+                {
+                    // BT-84 0..1 Payment account identifier
+                    var iban = XmlUtils.NodeAsString(creditorAccount, "./ram:IBANID", nsmgr);
+
+                    // BT-85 0..1 Payment account name
+                    var accountName = XmlUtils.NodeAsString(creditorAccount, "./ram:AccountName", nsmgr);
+
+                    // BT-84-0 0..1 National account number (not SEPA)
+                    var proprietaryId = XmlUtils.NodeAsString(creditorAccount, "./ram:ProprietaryID", nsmgr);
+
+                    // BT-86 1..1 Payment service provider identifier
+                    var bic = XmlUtils.NodeAsString(creditorFinancialInstitution, "./ram:BICID", nsmgr);
+
+                    // Legacy payment service provider name
+                    var bankName = XmlUtils.NodeAsString(creditorFinancialInstitution, "./ram:Name", nsmgr);
+
+                    // Legacy bank routing ID for German banking systems
+                    var bankleitzahl = XmlUtils.NodeAsString(creditorFinancialInstitution, "./ram:GermanBankleitzahlID", nsmgr);
+                    paymentMeans.CreditorBankAccount = new BankAccount
+                    {
+                        ID = string.IsNullOrWhiteSpace(proprietaryId) ? null : proprietaryId,
+                        IBAN = string.IsNullOrWhiteSpace(iban) ? null : iban,
+                        Name = string.IsNullOrWhiteSpace(accountName) ? null : accountName,
+                        BIC = string.IsNullOrWhiteSpace(bic) ? null : bic,
+                        Bankleitzahl = string.IsNullOrWhiteSpace(bankleitzahl) ? null : bankleitzahl,
+                        BankName = string.IsNullOrWhiteSpace(bankName) ? null : bankName,
+                    };
+                }
+
+                // BT-91-00 0..1 Buyer bank information
+                var debtorAccount = node.SelectSingleNode(
+                    "./ram:PayerPartyDebtorFinancialAccount",
+                    nsmgr);
+                var debtorFinancialInstitution = node.SelectSingleNode(
+                    "./ram:PayerSpecifiedDebtorFinancialInstitution",
+                    nsmgr);
+                if (creditorAccount != null || creditorFinancialInstitution != null)
+                {
+                    // BT-84 0..1 Payment account identifier
+                    var iban = XmlUtils.NodeAsString(debtorAccount, "./ram:IBANID", nsmgr);
+
+                    // BT-85 0..1 Payment account name
+                    var accountName = XmlUtils.NodeAsString(debtorAccount, "./ram:AccountName", nsmgr);
+
+                    // BT-84-0 0..1 National account number (not SEPA)
+                    var proprietaryId = XmlUtils.NodeAsString(debtorAccount, "./ram:ProprietaryID", nsmgr);
+
+                    // BT-86 1..1 Payment service provider identifier
+                    var bic = XmlUtils.NodeAsString(debtorFinancialInstitution, "./ram:BICID", nsmgr);
+
+                    // Legacy payment service provider name
+                    var bankName = XmlUtils.NodeAsString(debtorFinancialInstitution, "./ram:Name", nsmgr);
+
+                    // Legacy bank routing ID for German banking systems
+                    var bankleitzahl = XmlUtils.NodeAsString(debtorFinancialInstitution, "./ram:GermanBankleitzahlID", nsmgr);
+                    paymentMeans.DebitorBankAccount = new BankAccount
+                    {
+                        ID = string.IsNullOrWhiteSpace(proprietaryId) ? null : proprietaryId,
+                        IBAN = string.IsNullOrWhiteSpace(iban) ? null : iban,
+                        Name = string.IsNullOrWhiteSpace(accountName) ? null : accountName,
+                        BIC = string.IsNullOrWhiteSpace(bic) ? null : bic,
+                        Bankleitzahl = string.IsNullOrWhiteSpace(bankleitzahl) ? null : bankleitzahl,
+                        BankName = string.IsNullOrWhiteSpace(bankName) ? null : bankName,
+                    };
+                }
+
+                retval.SpecifiedTradeSettlementPaymentMeans.Add(paymentMeans);
+            }
 
             retval.BillingPeriodStart = XmlUtils.NodeAsDateTime(doc.DocumentElement, "//ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime", nsmgr);
             retval.BillingPeriodEnd = XmlUtils.NodeAsDateTime(doc.DocumentElement, "//ram:ApplicableHeaderTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime", nsmgr);
-
-            XmlNodeList creditorFinancialAccountNodes = doc.SelectNodes("//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeePartyCreditorFinancialAccount", nsmgr);
-            XmlNodeList creditorFinancialInstitutions = doc.SelectNodes("//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayeeSpecifiedCreditorFinancialInstitution", nsmgr);
-
-            if (creditorFinancialAccountNodes.Count == creditorFinancialInstitutions.Count)
-            {
-                for (int i = 0; i < creditorFinancialAccountNodes.Count; i++)
-                {
-                    retval.AddCreditorFinancialAccount(iban: XmlUtils.NodeAsString(creditorFinancialAccountNodes[i], ".//ram:IBANID", nsmgr),
-                                                       bic: XmlUtils.NodeAsString(creditorFinancialInstitutions[i], ".//ram:BICID", nsmgr),
-                                                       id: XmlUtils.NodeAsString(creditorFinancialAccountNodes[i], ".//ram:ProprietaryID", nsmgr),
-                                                       bankleitzahl: XmlUtils.NodeAsString(creditorFinancialInstitutions[i], ".//ram:GermanBankleitzahlID", nsmgr),
-                                                       bankName: XmlUtils.NodeAsString(creditorFinancialInstitutions[i], ".//ram:Name", nsmgr),
-                                                       name: XmlUtils.NodeAsString(creditorFinancialAccountNodes[i], ".//ram:AccountName", nsmgr));
-                } // !for(i)
-            }
-
-            XmlNodeList debitorFinancialAccountNodes = doc.SelectNodes("//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayerPartyDebtorFinancialAccount", nsmgr);
-            XmlNodeList debitorFinancialInstitutions = doc.SelectNodes("//ram:ApplicableSupplyChainTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans/ram:PayerSpecifiedDebtorFinancialInstitution", nsmgr);
-
-            if (debitorFinancialAccountNodes.Count == debitorFinancialInstitutions.Count)
-            {
-                for (int i = 0; i < debitorFinancialAccountNodes.Count; i++)
-                {
-                    retval.AddDebitorFinancialAccount(iban: XmlUtils.NodeAsString(debitorFinancialAccountNodes[i], ".//ram:IBANID", nsmgr),
-                                                      bic: XmlUtils.NodeAsString(debitorFinancialInstitutions[i], ".//ram:BICID", nsmgr),
-                                                      id: XmlUtils.NodeAsString(debitorFinancialAccountNodes[i], ".//ram:ProprietaryID", nsmgr),
-                                                      bankleitzahl: XmlUtils.NodeAsString(debitorFinancialInstitutions[i], ".//ram:GermanBankleitzahlID", nsmgr),
-                                                      bankName: XmlUtils.NodeAsString(debitorFinancialInstitutions[i], ".//ram:Name", nsmgr));
-                } // !for(i)
-            }
 
             foreach (XmlNode node in doc.SelectNodes("//ram:ApplicableSupplyChainTradeSettlement/ram:ApplicableTradeTax", nsmgr))
             {
