@@ -646,10 +646,14 @@ namespace s2industries.ZUGFeRD.Test
             InvoiceDescriptor loadedInvoice = InvoiceDescriptor.Load(ms);
 
             // test the BankAccounts
-            Assert.AreEqual(iban1, loadedInvoice.CreditorBankAccounts[0].IBAN);
-            Assert.AreEqual(bic1, loadedInvoice.CreditorBankAccounts[0].BIC);
-            Assert.AreEqual(iban2, loadedInvoice.CreditorBankAccounts[1].IBAN);
-            Assert.AreEqual(bic2, loadedInvoice.CreditorBankAccounts[1].BIC);
+            var firstAccount = loadedInvoice.SpecifiedTradeSettlementPaymentMeans.ElementAtOrDefault(0);
+            var secondAccount = loadedInvoice.SpecifiedTradeSettlementPaymentMeans.ElementAtOrDefault(1);
+            Assert.IsNotNull(firstAccount?.CreditorBankAccount);
+            Assert.AreEqual(iban1, firstAccount.CreditorBankAccount.IBAN);
+            Assert.AreEqual(bic1, firstAccount.CreditorBankAccount.BIC);
+            Assert.IsNotNull(secondAccount?.CreditorBankAccount);
+            Assert.AreEqual(iban2, secondAccount.CreditorBankAccount.IBAN);
+            Assert.AreEqual(bic2, secondAccount.CreditorBankAccount.BIC);
         } // !TestMultipleCreditorBankAccounts()
 
         [TestMethod]
@@ -693,7 +697,7 @@ namespace s2industries.ZUGFeRD.Test
 
             loadedInvoice.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
             {
-                TypeCode = PaymentMeansTypeCodes.SEPACreditTransfer,
+                TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
                 Information = "Hier sind Informationen",
                 SEPACreditorIdentifier = "DE75512108001245126199", 
                 SEPAMandateReference = "[Mandate reference identifier]",
@@ -1191,11 +1195,13 @@ namespace s2industries.ZUGFeRD.Test
 
             Assert.AreEqual(desc.GetTradePaymentTerms().FirstOrDefault().DueDate, new DateTime(2020, 6, 21));
 
-            Assert.AreEqual(desc.CreditorBankAccounts[0].IBAN, "DE12500105170648489890");
-            Assert.AreEqual(desc.CreditorBankAccounts[0].BIC, "INGDDEFFXXX");
-            Assert.AreEqual(desc.CreditorBankAccounts[0].Name, "Harry Hirsch");
+            var firstSettlement = desc.SpecifiedTradeSettlementPaymentMeans.FirstOrDefault();
+            Assert.IsNotNull(firstSettlement?.CreditorBankAccount);
+            Assert.AreEqual("DE12500105170648489890", firstSettlement.CreditorBankAccount.IBAN);
+            Assert.AreEqual("INGDDEFFXXX", firstSettlement.CreditorBankAccount.BIC);
+            Assert.AreEqual("Harry Hirsch", firstSettlement.CreditorBankAccount.Name);
 
-            Assert.AreEqual(desc.PaymentMeans.TypeCode, PaymentMeansTypeCodes.CreditTransferNonSEPA);
+            Assert.AreEqual(PaymentMeansTypeCodes.CreditTransferNonSEPA, desc.SpecifiedTradeSettlementPaymentMeans.FirstOrDefault()?.TypeCode);
         } // !TestReferenceXRechnung21UBL()
 
 

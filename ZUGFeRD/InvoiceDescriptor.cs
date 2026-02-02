@@ -459,6 +459,7 @@ namespace s2industries.ZUGFeRD
         ///
         /// BG-17
         /// </summary>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         public List<BankAccount> CreditorBankAccounts =>
             this.SpecifiedTradeSettlementPaymentMeans
                 .Where(tradeSettlement => tradeSettlement.CreditorBankAccount != null)
@@ -470,6 +471,7 @@ namespace s2industries.ZUGFeRD
         ///
         /// BG-16
         /// </summary>
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         public List<BankAccount> DebitorBankAccounts =>
             this.SpecifiedTradeSettlementPaymentMeans
                 .Where(tradeSettlement => tradeSettlement.DebitorBankAccount != null)
@@ -2013,6 +2015,7 @@ namespace s2industries.ZUGFeRD
         } // !AddCreditorFinancialAccount()
 
 
+        [Obsolete("PaymentMeans should be set/added directly in SpecifiedTradeSettlementPaymentMeans")]
         internal void _AddCreditorFinancialAccount(BankAccount bankAccount)
         {
             this.CreditorBankAccounts.Add(bankAccount);

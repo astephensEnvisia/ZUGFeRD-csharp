@@ -1015,11 +1015,13 @@ namespace s2industries.ZUGFeRD.Test
             Assert.AreEqual(Profile.Comfort, invoiceDescriptor.Profile);
             Assert.AreEqual(InvoiceType.Invoice, invoiceDescriptor.Type);
 
-            Assert.AreEqual("DE98ZZZ09999999999", invoiceDescriptor.PaymentMeans.SEPACreditorIdentifier);
-            Assert.AreEqual("REF A-123", invoiceDescriptor.PaymentMeans.SEPAMandateReference);
-            Assert.AreEqual(PaymentMeansTypeCodes.SEPADirectDebit, invoiceDescriptor.PaymentMeans.TypeCode);
-            Assert.HasCount(1, invoiceDescriptor.DebitorBankAccounts);
-            Assert.AreEqual("DE21860000000086001055", invoiceDescriptor.DebitorBankAccounts[0].IBAN);
+            var firstSettlement = invoiceDescriptor.SpecifiedTradeSettlementPaymentMeans.FirstOrDefault();
+            Assert.IsNotNull(firstSettlement);
+            Assert.AreEqual("DE98ZZZ09999999999", firstSettlement.SEPACreditorIdentifier);
+            Assert.AreEqual("REF A-123", firstSettlement.SEPAMandateReference);
+            Assert.AreEqual(PaymentMeansTypeCodes.SEPADirectDebit, firstSettlement.TypeCode);
+            Assert.IsNotNull(firstSettlement.DebitorBankAccount);
+            Assert.AreEqual("DE21860000000086001055", firstSettlement.DebitorBankAccount.IBAN);
 
             Assert.AreEqual("Der Betrag in Höhe von EUR 529,87 wird am 20.03.2018 von Ihrem Konto per SEPA-Lastschrift eingezogen.",
                 invoiceDescriptor.GetTradePaymentTerms().FirstOrDefault().Description.Trim());
@@ -1129,10 +1131,14 @@ namespace s2industries.ZUGFeRD.Test
 
                 var d2 = InvoiceDescriptor.Load(stream);
                 Assert.AreEqual(d2.Currency, CurrencyCodes.EUR);
-                Assert.AreEqual("DE98ZZZ09999999999", d2.SpecifiedTradeSettlementPaymentMeans?.FirstOrDefault()?.SEPACreditorIdentifier);
-                Assert.AreEqual("REF A-123", d2.SpecifiedTradeSettlementPaymentMeans?.FirstOrDefault()?.SEPAMandateReference);
-                Assert.HasCount(1, d2.DebitorBankAccounts);
-                Assert.AreEqual("DE21860000000086001055", d2.DebitorBankAccounts[0].IBAN);
+
+                var firstSettlement = d2.SpecifiedTradeSettlementPaymentMeans.FirstOrDefault();
+                Assert.IsNotNull(firstSettlement);
+                Assert.AreEqual("DE98ZZZ09999999999", firstSettlement.SEPACreditorIdentifier);
+                Assert.AreEqual("REF A-123", firstSettlement.SEPAMandateReference);
+                Assert.IsNotNull(firstSettlement.DebitorBankAccount);
+                Assert.AreEqual("DE21860000000086001055", firstSettlement.DebitorBankAccount.IBAN);
+
                 Assert.IsTrue(d.Seller.SpecifiedLegalOrganization.ID.SchemeID.HasValue);
                 Assert.AreEqual(GlobalIDSchemeIdentifiers.GLN, d.Seller.SpecifiedLegalOrganization.ID.SchemeID.Value);
                 Assert.AreEqual("4000001123452", d.Seller.SpecifiedLegalOrganization.ID.ID);
@@ -1895,9 +1901,13 @@ namespace s2industries.ZUGFeRD.Test
                 Country = CountryCodes.DE
             };
 
-            desc.PaymentMeans.SEPACreditorIdentifier = "SepaID";
-            desc.PaymentMeans.SEPAMandateReference = "SepaMandat";
-            desc.PaymentMeans.FinancialCard = new FinancialCard { Id = "123", CardholderName = "Mustermann" };
+            desc.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPACreditTransfer,
+                SEPACreditorIdentifier = "SepaID",
+                SEPAMandateReference = "SepaMandat",
+                FinancialCard = new FinancialCard { Id = "123", CardholderName = "Mustermann" },
+            });
 
             desc.PaymentReference = "PaymentReference";
 
@@ -2034,23 +2044,26 @@ namespace s2industries.ZUGFeRD.Test
 
 
             Assert.AreEqual(new DateTime(2018, 03, 05), loadedInvoice.ActualDeliveryDate);
-            Assert.AreEqual(PaymentMeansTypeCodes.SEPACreditTransfer, loadedInvoice.PaymentMeans.TypeCode);
-            Assert.AreEqual("Zahlung per SEPA Überweisung.", loadedInvoice.PaymentMeans.Information);
 
             Assert.AreEqual("PaymentReference", loadedInvoice.PaymentReference);
 
-            Assert.AreEqual("", loadedInvoice.PaymentMeans.SEPACreditorIdentifier);
-            Assert.AreEqual("SepaMandat", loadedInvoice.PaymentMeans.SEPAMandateReference);
-            Assert.AreEqual("123", loadedInvoice.PaymentMeans.FinancialCard.Id);
-            Assert.AreEqual("Mustermann", loadedInvoice.PaymentMeans.FinancialCard.CardholderName);
+            var firstSettlement = loadedInvoice.SpecifiedTradeSettlementPaymentMeans.FirstOrDefault();
+            Assert.IsNotNull(firstSettlement);
+            Assert.AreEqual(PaymentMeansTypeCodes.SEPACreditTransfer, firstSettlement.TypeCode);
+            Assert.AreEqual("Zahlung per SEPA Überweisung.", firstSettlement.Information);
+            Assert.AreEqual("", firstSettlement.SEPACreditorIdentifier);
+            Assert.AreEqual("SepaMandat", firstSettlement.SEPAMandateReference);
+            Assert.AreEqual("123", firstSettlement.FinancialCard.Id);
+            Assert.AreEqual("Mustermann", firstSettlement.FinancialCard.CardholderName);
 
-            var bankAccount = loadedInvoice.CreditorBankAccounts.FirstOrDefault(a => a.IBAN == "DE02120300000000202051");
-            Assert.IsNotNull(bankAccount);
-            Assert.AreEqual("Kunden AG", bankAccount.Name);
-            Assert.AreEqual("DE02120300000000202051", bankAccount.IBAN);
-            Assert.AreEqual("BYLADEM1001", bankAccount.BIC);
+            Assert.IsNotNull(firstSettlement.CreditorBankAccount);
+            Assert.AreEqual("Kunden AG", firstSettlement.CreditorBankAccount.Name);
+            Assert.AreEqual("DE02120300000000202051", firstSettlement.CreditorBankAccount.IBAN);
+            Assert.AreEqual("BYLADEM1001", firstSettlement.CreditorBankAccount.BIC);
 
-            var debitorBankAccount = loadedInvoice.DebitorBankAccounts.FirstOrDefault(a => a.IBAN == "DE02120300000000202052");
+            var debitorBankAccount = loadedInvoice.SpecifiedTradeSettlementPaymentMeans
+                .Select(q => q.DebitorBankAccount)
+                .FirstOrDefault(a => a.IBAN == "DE02120300000000202052");
             Assert.IsNotNull(debitorBankAccount);
             Assert.AreEqual("DE02120300000000202052", debitorBankAccount.IBAN);
 
@@ -2205,9 +2218,16 @@ namespace s2industries.ZUGFeRD.Test
 
             InvoiceDescriptor desc = this._InvoiceProvider.CreateInvoice();
             //PayeeSpecifiedCreditorFinancialInstitution
-            desc.CreditorBankAccounts[0].BIC = String.Empty;
-            //PayerSpecifiedDebtorFinancialInstitution
-            desc.AddDebitorFinancialAccount("DE02120300000000202051", String.Empty);
+            desc.SpecifiedTradeSettlementPaymentMeans =
+            [
+                new SpecifiedTradeSettlementPaymentMeans
+                {
+                    DebitorBankAccount = new BankAccount
+                    {
+                        IBAN = "DE02120300000000202051",
+                    },
+                },
+            ];
 
             MemoryStream ms = new MemoryStream();
             desc.Save(ms, ZUGFeRDVersion.Version23, Profile.Comfort);

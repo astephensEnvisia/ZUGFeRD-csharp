@@ -50,7 +50,12 @@ namespace s2industries.ZUGFeRD.Test
 
             Assert.AreEqual(desc.Profile, Profile.Comfort);
             Assert.AreEqual(desc.Type, InvoiceType.Invoice);
-            Assert.AreEqual(desc.CreditorBankAccounts[0].BankName, "Hausbank München");
+            var creditorBankAccount = desc.SpecifiedTradeSettlementPaymentMeans
+                .Where(q => q.CreditorBankAccount != null)
+                .Select(q => q.CreditorBankAccount)
+                .FirstOrDefault();
+            Assert.IsNotNull(creditorBankAccount);
+            Assert.AreEqual("Hausbank München", creditorBankAccount.BankName);
         } // !TestReferenceComfortInvoiceRabattiert()
 
 
