@@ -1075,12 +1075,16 @@ namespace s2industries.ZUGFeRD.Test
                 city: "Frankfurt",
                 street: "Kundenstraße 15",
                 country: CountryCodes.DE);
-            d.SetPaymentMeansSepaDirectDebit(
-                "DE98ZZZ09999999999",
-                "REF A-123");
-            d.AddDebitorFinancialAccount(
-                "DE21860000000086001055",
-                null);
+            d.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                SEPACreditorIdentifier = "DE98ZZZ09999999999",
+                SEPAMandateReference = "REF A-123",
+                DebitorBankAccount = new BankAccount
+                {
+                    IBAN = "DE21860000000086001055",
+                },
+            });
             d.AddTradePaymentTerms(
                 "Der Betrag in Höhe von EUR 529,87 wird am 20.03.2018 von Ihrem Konto per SEPA-Lastschrift eingezogen.");
             d.SetTotals(
@@ -1125,8 +1129,8 @@ namespace s2industries.ZUGFeRD.Test
 
                 var d2 = InvoiceDescriptor.Load(stream);
                 Assert.AreEqual(d2.Currency, CurrencyCodes.EUR);
-                Assert.AreEqual("DE98ZZZ09999999999", d2.PaymentMeans.SEPACreditorIdentifier);
-                Assert.AreEqual("REF A-123", d2.PaymentMeans.SEPAMandateReference);
+                Assert.AreEqual("DE98ZZZ09999999999", d2.SpecifiedTradeSettlementPaymentMeans?.FirstOrDefault()?.SEPACreditorIdentifier);
+                Assert.AreEqual("REF A-123", d2.SpecifiedTradeSettlementPaymentMeans?.FirstOrDefault()?.SEPAMandateReference);
                 Assert.HasCount(1, d2.DebitorBankAccounts);
                 Assert.AreEqual("DE21860000000086001055", d2.DebitorBankAccounts[0].IBAN);
                 Assert.IsTrue(d.Seller.SpecifiedLegalOrganization.ID.SchemeID.HasValue);
@@ -3243,12 +3247,16 @@ namespace s2industries.ZUGFeRD.Test
                 city: "Frankfurt",
                 street: "Kundenstraße 15",
                 country: CountryCodes.DE);
-            d.SetPaymentMeansSepaDirectDebit(
-                "DE98ZZZ09999999999",
-                "REF A-123");
-            d.AddDebitorFinancialAccount(
-                "DE21860000000086001055",
-                null);
+            d.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                SEPACreditorIdentifier = "DE98ZZZ09999999999",
+                SEPAMandateReference = "REF A-123",
+                DebitorBankAccount = new BankAccount
+                {
+                    IBAN = "DE21860000000086001055",
+                },
+            });
             d.AddTradePaymentTerms(
                 "Der Betrag in Höhe von EUR 235,62 wird am 20.03.2018 von Ihrem Konto per SEPA-Lastschrift eingezogen.");
             d.SetTotals(
@@ -3329,13 +3337,18 @@ namespace s2industries.ZUGFeRD.Test
                 city: "Frankfurt",
                 street: "Kundenstraße 15",
                 country: CountryCodes.DE);
-            d.SetPaymentMeans(PaymentMeansTypeCodes.SEPACreditTransfer,
-                "Information of Payment Means",
-                "DE98ZZZ09999999999",
-                "REF A-123");
-            d.AddDebitorFinancialAccount(
-                "DE21860000000086001055",
-                null);
+            d.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPACreditTransfer,
+                Information = "Information of Payment Means",
+                SEPACreditorIdentifier = "DE98ZZZ09999999999",
+                SEPAMandateReference= "REF A-123",
+                DebitorBankAccount = new BankAccount
+                {
+                    IBAN = "DE21860000000086001055",
+                },
+            });
+
             d.AddTradePaymentTerms(
                 "Der Betrag in Höhe von EUR 235,62 wird am 20.03.2018 von Ihrem Konto per SEPA-Lastschrift eingezogen.");
             d.SetTotals(

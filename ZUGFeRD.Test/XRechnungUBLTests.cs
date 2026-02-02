@@ -691,7 +691,14 @@ namespace s2industries.ZUGFeRD.Test
 
             InvoiceDescriptor loadedInvoice = InvoiceDescriptor.Load(ms);
 
-            loadedInvoice.SetPaymentMeans(PaymentMeansTypeCodes.SEPACreditTransfer, "Hier sind Informationen", "DE75512108001245126199", "[Mandate reference identifier]");
+            loadedInvoice.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPACreditTransfer,
+                Information = "Hier sind Informationen",
+                SEPACreditorIdentifier = "DE75512108001245126199", 
+                SEPAMandateReference = "[Mandate reference identifier]",
+            });
+
             MemoryStream resultStream = new MemoryStream();
             loadedInvoice.Save(resultStream, ZUGFeRDVersion.Version23, Profile.XRechnung, ZUGFeRDFormats.UBL);
 
@@ -774,12 +781,17 @@ namespace s2industries.ZUGFeRD.Test
                 city: "Frankfurt",
                 street: "Kundenstraße 15",
                 country: CountryCodes.DE);
-            d.SetPaymentMeansSepaDirectDebit(
-                "DE98ZZZ09999999999",
-                "REF A-123");
-            d.AddDebitorFinancialAccount(
-                "DE21860000000086001055",
-                null);
+            d.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                SEPACreditorIdentifier = "DE98ZZZ09999999999",
+                SEPAMandateReference = "REF A-123",
+                DebitorBankAccount = new BankAccount
+                {
+                    IBAN = "DE21860000000086001055",
+                },
+            });
+
             d.AddTradePaymentTerms(
                 "Der Betrag in Höhe von EUR 235,62 wird am 20.03.2018 von Ihrem Konto per SEPA-Lastschrift eingezogen.");
             d.SetTotals(
@@ -860,12 +872,16 @@ namespace s2industries.ZUGFeRD.Test
                 city: "Frankfurt",
                 street: "Kundenstraße 15",
                 country: CountryCodes.DE);
-            d.SetPaymentMeansSepaDirectDebit(
-                "DE98ZZZ09999999999",
-                "REF A-123");
-            d.AddDebitorFinancialAccount(
-                "DE21860000000086001055",
-                null);
+            d.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                SEPACreditorIdentifier = "DE98ZZZ09999999999",
+                SEPAMandateReference = "REF A-123",
+                DebitorBankAccount = new BankAccount
+                {
+                    IBAN = "DE21860000000086001055",
+                },
+            });
             d.AddTradePaymentTerms(
                 "Der Betrag in Höhe von EUR 235,62 wird am 20.03.2018 von Ihrem Konto per SEPA-Lastschrift eingezogen.");
             d.SetTotals(
@@ -945,12 +961,16 @@ namespace s2industries.ZUGFeRD.Test
                 city: "Frankfurt",
                 street: "Kundenstraße 15",
                 country: CountryCodes.DE);
-            d.SetPaymentMeansSepaDirectDebit(
-                "DE98ZZZ09999999999",
-                "REF A-123");
-            d.AddDebitorFinancialAccount(
-                "DE21860000000086001055",
-                null);
+            d.SpecifiedTradeSettlementPaymentMeans.Add(new SpecifiedTradeSettlementPaymentMeans
+            {
+                TypeCode = PaymentMeansTypeCodes.SEPADirectDebit,
+                SEPACreditorIdentifier = "DE98ZZZ09999999999",
+                SEPAMandateReference = "REF A-123",
+                DebitorBankAccount = new BankAccount
+                {
+                    IBAN = "DE21860000000086001055",
+                },
+            });
             d.AddTradePaymentTerms(
                 "Der Betrag in Höhe von EUR 235,62 wird am 20.03.2018 von Ihrem Konto per SEPA-Lastschrift eingezogen.");
             d.SetTotals(

@@ -90,9 +90,18 @@ namespace s2industries.ZUGFeRD.Test
 			desc.SetBuyerElectronicAddress("DE2020211", ElectronicAddressSchemeIdentifiers.GermanyVatNumber);
 
 			desc.ActualDeliveryDate = new DateTime(2018, 03, 05);
-			desc.SetPaymentMeans(PaymentMeansTypeCodes.SEPACreditTransfer, "Zahlung per SEPA Überweisung.");
-			desc.AddCreditorFinancialAccount(iban: "DE02120300000000202051", bic: "BYLADEM1001", name: "Kunden AG");
-			//desc.AddDebitorFinancialAccount(iban: "DB02120300000000202051", bic: "DBBYLADEM1001", bankName: "KundenDB AG");
+			desc.SpecifiedTradeSettlementPaymentMeans.Add(
+                new SpecifiedTradeSettlementPaymentMeans {
+                    TypeCode = PaymentMeansTypeCodes.SEPACreditTransfer,
+                    Information = "Zahlung per SEPA Überweisung.",
+                    CreditorBankAccount = new BankAccount
+                    {
+                        IBAN = "DE02120300000000202051",
+                        BIC = "BYLADEM1001",
+                        BankName = "Kunden AG",
+                    },
+                });
+
 			desc.AddApplicableTradeTax(basisAmount: 275.0m,
 								 percent: 7m,
                                  taxAmount: 275.0m / 100m * 7m,
